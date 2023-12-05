@@ -1,0 +1,61 @@
+---
+title: "assignment-b4"
+author: "Alma Garcia"
+date: "2023-12-04"
+output: github_document
+---
+
+# Strings and functional programming in R
+
+## Exercise 1
+
+For this exercise I chose the book "Frankenstein" by Mary Shelley (a favorite of mine). The book was downloaded as plain text from [Project Gutenberg](https://www.gutenberg.org/ebooks/84). 
+
+```{r}
+library(stringr)
+library(purrr)
+library(stopwords)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+con <- file("files/frankenstein.txt")
+frankenstein_book <- readLines(con) %>% tolower()
+head(frankenstein_book)
+```
+
+So the book actually starts at line 70 and ends at line 7385, we will extract the relevant content to work with it. I will also keep lines that have at least 1 character. 
+
+```{r}
+frankenstein <- frankenstein_book[70:7385] %>%
+	str_subset(".+")
+
+head(frankenstein)
+```
+Now we need to create our unique words list and remove "stop words" with the `stopwords` package. 
+
+```{r}
+stop_words <- str_c(stopwords::stopwords(), collapse = "|")
+```
+
+```{r}
+frankenstein_words <- frankenstein %>% 
+	str_split("\\s+") %>% # split lines into words
+	unlist() %>% # break the list structure
+	str_replace_all("[:punct:]", " ") %>% # turns punctuation into spaces (some words have em dashes between)
+	str_subset("^[a-z]+$") %>% # filters out punctuation and numbers
+```
+
+```{r}
+head(frankenstein_words, 20)
+```
+Now we need to count the number of unique words so we can create the plot:
+
+```{r}
+frankenstein_unique <- as_tibble(frankenstein_words) %>%
+	filter(!(value %in% stopwords(source = "snowball"))) %>%
+	group_by(value) %>%
+	reframe(count = n())
+```
+

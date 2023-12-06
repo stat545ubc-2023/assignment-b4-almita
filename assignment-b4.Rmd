@@ -14,9 +14,8 @@ For this exercise I chose the book "Frankenstein" by Mary Shelley (a favorite of
 ```{r}
 library(stringr)
 library(purrr)
-library(stopwords)
 library(dplyr)
-library(ggplot2)
+library(tm)
 ```
 
 ```{r}
@@ -33,29 +32,73 @@ frankenstein <- frankenstein_book[70:7385] %>%
 
 head(frankenstein)
 ```
-Now we need to create our unique words list and remove "stop words" with the `stopwords` package. 
-
-```{r}
-stop_words <- str_c(stopwords::stopwords(), collapse = "|")
-```
+Now we need to create our unique words list. 
 
 ```{r}
 frankenstein_words <- frankenstein %>% 
 	str_split("\\s+") %>% # split lines into words
 	unlist() %>% # break the list structure
-	str_replace_all("[:punct:]", " ") %>% # turns punctuation into spaces (some words have em dashes between)
-	str_subset("^[a-z]+$") %>% # filters out punctuation and numbers
+	str_replace_all("[:punct:]", " ") %>% # turns punctuation into spaces (because some words have em dashes between)
+	str_subset("^[a-z]+$") # filters out punctuation and numbers
 ```
 
 ```{r}
 head(frankenstein_words, 20)
 ```
-Now we need to count the number of unique words so we can create the plot:
+And then we need to count the number of unique words so we can create plots:
 
 ```{r}
 frankenstein_unique <- as_tibble(frankenstein_words) %>%
-	filter(!(value %in% stopwords(source = "snowball"))) %>%
+	filter(!value %in% tm::stopwords("SMART")) %>% # remove stop words
 	group_by(value) %>%
-	reframe(count = n())
+	reframe(count = n()) %>%
+	rename(word = value) 
+
+head(frankenstein_unique)
 ```
 
+To visualize the most used words let's make a word cloud using the `wordcloud` package:
+
+```{r}
+library(wordcloud)
+```
+
+```{r}
+# color palette
+pal = c("#3C4B69FF", "#4B5A69FF", "#697878FF", "#4B4B4BFF", "#3C3C3CFF", "#3C3C1EFF", "#695A2DFF", "#78693CFF", "#78784BFF", "#C0BB9DFF", "#C2902FFF", "#965A0FFF", "#784B0FFF", "#5A4B0FFF")
+```
+
+
+```{r}
+wordcloud(frankenstein_unique$word, 
+					frankenstein_unique$count, 
+					max.words = 500,
+					random.order = FALSE, 
+					random.color = TRUE,
+					scale = c(2.5, 0.05), 
+					rot.per=0,
+					fixed.asp = FALSE,
+					family = "Kingthings Trypewriter 2", 
+					font = 1, 
+					col = pal)
+```
+
+And we'll make another plot, this time a barplot, to show the top 15 words:
+
+```{r}
+frankenstein_unique %>%
+	arrange(desc(count)) %>%
+	slice_head(n = 15) %>%
+	ggplot(aes(reorder(word, -count), count)) +
+	geom_col(fill = pal[1], position = position_dodge(width=0.5)) +
+	xlab("word") +
+	scale_y_continuous(expand = c(0,0.15)) +
+	theme_minimal() +
+	theme(text = element_text(color = pal[1], family = "Kingthings Trypewriter 2"),
+				axis.title = element_text(size = 16),
+				axis.text = element_text(color = pal[1]),
+				axis.text.x = element_text(angle = 30, hjust=1),
+				axis.ticks.x.bottom = element_line(linewidth = 0.5, color = "#EBEBEB"),
+				panel.grid.major.x = element_blank()
+				) 
+```

@@ -23,7 +23,7 @@ frankenstein_book <- readLines(con) %>% tolower()
 head(frankenstein_book)
 ```
 
-So the book actually starts at line 70 and ends at line 7385, we will extract the relevant content to work with it. I will also keep lines that have at least 1 character. 
+So the book actually starts at line 70 and ends at line 7385, I'll extract the relevant content to work with it. I'll also keep lines that have at least 1 character. 
 
 ```{r}
 frankenstein <- frankenstein_book[70:7385] %>%
@@ -31,7 +31,7 @@ frankenstein <- frankenstein_book[70:7385] %>%
 
 head(frankenstein)
 ```
-Now we need to create our unique words list. 
+Now I need to create the unique words list. 
 
 ```{r}
 frankenstein_words <- frankenstein %>% 
@@ -44,11 +44,11 @@ frankenstein_words <- frankenstein %>%
 ```{r}
 head(frankenstein_words, 20)
 ```
-And then we need to count the number of unique words so we can create plots:
+And then I need to count the number of unique words and remove the stop words so I can create the plots. For removing the stopwords I used the [tm: text mining](https://cran.r-project.org/web/packages/tm/index.html) package
 
 ```{r}
 frankenstein_unique <- as_tibble(frankenstein_words) %>%
-	filter(!value %in% tm::stopwords("SMART")) %>% # remove stop words
+	filter(!value %in% tm::stopwords("SMART")) 
 	group_by(value) %>%
 	reframe(count = n()) %>%
 	rename(word = value) 
@@ -67,7 +67,6 @@ library(wordcloud)
 pal = c("#3C4B69FF", "#4B5A69FF", "#697878FF", "#4B4B4BFF", "#3C3C3CFF", "#3C3C1EFF", "#695A2DFF", "#78693CFF", "#78784BFF", "#C0BB9DFF", "#C2902FFF", "#965A0FFF", "#784B0FFF", "#5A4B0FFF")
 ```
 
-
 ```{r wordcloud}
 wordcloud(frankenstein_unique$word, 
 					frankenstein_unique$count, 
@@ -82,7 +81,7 @@ wordcloud(frankenstein_unique$word,
 					col = pal)
 ```
 
-And we'll make another plot, this time a barplot, to show the top 15 words:
+And I'll also make another plot, this time a barplot, to show the top 15 words:
 
 ```{r bar_plot}
 library(ggplot2)

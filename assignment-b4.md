@@ -248,11 +248,12 @@ spotify_distinct %>%
         facet_wrap(~artist_name)
 ```
 
-![](assignment-b4_files/figure-gfm/scatter_plots-1.png)<!-- --> There
-seems to be a somewhat negative trend for Lana del Rey’s music getting
-less energetic throughout the years. Arctic Monkey’s las album also
-seems to be much more less energetic than the rest. alt-J doesn’t show
-much difference, and KG&LW is all over the place.
+![](assignment-b4_files/figure-gfm/scatter_plots-1.png)<!-- -->
+
+There seems to be a somewhat negative trend for Lana del Rey’s music
+getting less energetic throughout the years. Arctic Monkey’s las album
+also seems to be much more less energetic than the rest. alt-J doesn’t
+show much difference, and KG&LW is all over the place.
 
 Another plot that can help visualize this evolution is a ridgeline plot.
 
@@ -359,118 +360,75 @@ the model doesn’t predict at all the behavior of energy across time
 However after looking at the distribution plots I’m sure there are at
 least some albums whose average energy is significantly different from
 the others, at least for Arctic Monkeys, Lana del Rey, and KG&LW. So
-I’ll try to perform an anova model too :D
+I’ll do an anova model too to determine if there are at least 1 album
+with a significantly different mean energy than the others for each
+artist.
 
 ``` r
 spotify_models <- spotify_models %>%
     mutate(aov = map(data, \(x) aov(energy ~ album_name, x)),
-                 aov_summary = map(aov, summary)
+                 aov_summary = map(aov, broom::tidy)
                  ) 
 names(spotify_models$aov) <- artists
 names(spotify_models$aov_summary) <- artists
-
-spotify_models$aov_summary
 ```
 
-    ## $`alt-J`
-    ##             Df Sum Sq Mean Sq F value Pr(>F)
-    ## album_name   3  0.133 0.04431   0.664  0.578
-    ## Residuals   49  3.272 0.06677               
-    ## 
-    ## $`Arctic Monkeys`
-    ##             Df Sum Sq Mean Sq F value   Pr(>F)    
-    ## album_name   6  1.991  0.3318   18.67 4.98e-13 ***
-    ## Residuals   73  1.298  0.0178                     
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## $`Lana Del Rey`
-    ##              Df Sum Sq Mean Sq F value Pr(>F)    
-    ## album_name    8  2.639  0.3299   16.98 <2e-16 ***
-    ## Residuals   114  2.215  0.0194                   
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## $`King Gizzard & The Lizard Wizard`
-    ##              Df Sum Sq Mean Sq F value   Pr(>F)    
-    ## album_name   26  1.814 0.06979   3.059 2.86e-06 ***
-    ## Residuals   260  5.932 0.02282                     
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+``` r
+spotify_models %>%
+    unnest(aov_summary) %>%
+    filter(term != "Residuals") %>%
+    select(artist_name,p.value)
+```
 
-We can see from the `Pr(>F)` values that for Arctic Monkeys, Lana del
-Rey, and KG&LW there is at least 1 album that has a significantly
-different mean energy from the rest. So now I can perform a Tukey HSD
-test to see exactly which albums have significantly differente mean
-energy from each other.
+    ## # A tibble: 4 × 2
+    ##   artist_name                       p.value
+    ##   <chr>                               <dbl>
+    ## 1 alt-J                            5.78e- 1
+    ## 2 Arctic Monkeys                   4.98e-13
+    ## 3 Lana Del Rey                     2.17e-16
+    ## 4 King Gizzard & The Lizard Wizard 2.86e- 6
+
+We can see from the p.values that for Arctic Monkeys, Lana del Rey, and
+KG&LW there is at least 1 album that has a significantly different mean
+energy from the rest. So now I can perform a Tukey HSD test to see
+exactly which albums have significantly different mean energy from each
+other.
 
 ``` r
 spotify_models <- spotify_models %>%
     mutate(tukey = map(aov, \(x) TukeyHSD(x) %>% broom::tidy()))
 
 names(spotify_models$tukey) <- artists
-
-walk(spotify_models$tukey, 
-        \(x) { tbl <- filter(x, adj.p.value < 0.05) %>% # print only significantly different pairs
-        select(contrast, estimate, conf.low, conf.high, adj.p.value)
-        print(tbl) 
-        }
-     ) 
 ```
 
-    ## # A tibble: 0 × 5
-    ## # ℹ 5 variables: contrast <chr>, estimate <dbl>, conf.low <dbl>,
-    ## #   conf.high <dbl>, adj.p.value <dbl>
-    ## # A tibble: 9 × 5
-    ##   contrast                               estimate conf.low conf.high adj.p.value
-    ##   <chr>                                     <dbl>    <dbl>     <dbl>       <dbl>
-    ## 1 Favourite Worst Nightmare (Standard V…    0.196   0.0306     0.361     1.01e-2
-    ## 2 Suck It and See-AM                        0.219   0.0541     0.384     2.52e-3
-    ## 3 The Car-AM                               -0.286  -0.459     -0.113     7.26e-5
-    ## 4 Whatever People Say I Am, That's What…    0.191   0.0289     0.353     1.08e-2
-    ## 5 The Car-Favourite Worst Nightmare (St…   -0.482  -0.655     -0.309     0      
-    ## 6 The Car-Humbug                           -0.413  -0.594     -0.233     2.87e-8
-    ## 7 The Car-Suck It and See                  -0.505  -0.678     -0.332     0      
-    ## 8 Tranquility Base Hotel & Casino-The C…    0.361   0.185      0.538     6.24e-7
-    ## 9 Whatever People Say I Am, That's What…    0.477   0.307      0.647     0      
-    ## # A tibble: 17 × 5
-    ##    contrast                              estimate conf.low conf.high adj.p.value
-    ##    <chr>                                    <dbl>    <dbl>     <dbl>       <dbl>
-    ##  1 Born To Die (Deluxe Version)-Blue Ba…    0.390   0.229     0.551     2.29e-10
-    ##  2 Lust For Life-Blue Banisters             0.238   0.0799    0.397     1.96e- 4
-    ##  3 Paradise-Blue Banisters                  0.239   0.0463    0.432     4.61e- 3
-    ##  4 Ultraviolence (Deluxe)-Blue Banisters    0.262   0.0979    0.425     5.77e- 5
-    ##  5 Chemtrails Over The Country Club-Bor…   -0.422  -0.597    -0.247     2.84e-10
-    ##  6 Did you know that there's a tunnel u…   -0.399  -0.558    -0.241     4.69e-11
-    ##  7 Honeymoon-Born To Die (Deluxe Versio…   -0.270  -0.434    -0.106     2.95e- 5
-    ##  8 Norman Fucking Rockwell!-Born To Die…   -0.393  -0.557    -0.229     3.50e-10
-    ##  9 Lust For Life-Chemtrails Over The Co…    0.270   0.0973    0.443     9.06e- 5
-    ## 10 Paradise-Chemtrails Over The Country…    0.271   0.0661    0.476     1.81e- 3
-    ## 11 Ultraviolence (Deluxe)-Chemtrails Ov…    0.293   0.116     0.471     2.78e- 5
-    ## 12 Lust For Life-Did you know that ther…    0.248   0.0917    0.403     6.53e- 5
-    ## 13 Paradise-Did you know that there's a…    0.249   0.0577    0.439     2.30e- 3
-    ## 14 Ultraviolence (Deluxe)-Did you know …    0.271   0.110     0.432     1.90e- 5
-    ## 15 Norman Fucking Rockwell!-Lust For Li…   -0.241  -0.402    -0.0796    2.25e- 4
-    ## 16 Paradise-Norman Fucking Rockwell!        0.242   0.0465    0.437     4.70e- 3
-    ## 17 Ultraviolence (Deluxe)-Norman Fuckin…    0.264   0.0977    0.431     6.70e- 5
-    ## # A tibble: 8 × 5
-    ##   contrast                               estimate conf.low conf.high adj.p.value
-    ##   <chr>                                     <dbl>    <dbl>     <dbl>       <dbl>
-    ## 1 The Silver Cord-Chunky Shrapnel           0.242  0.0351     0.448     0.00501 
-    ## 2 The Silver Cord-Gumboot Soup              0.230  0.00267    0.458     0.0434  
-    ## 3 PetroDragonic Apocalypse; or, Dawn of…    0.270  0.00123    0.538     0.0473  
-    ## 4 The Silver Cord-Paper Mâché Dream Bal…    0.270  0.0483     0.493     0.00243 
-    ## 5 Polygondwanaland-PetroDragonic Apocal…   -0.306 -0.585     -0.0281    0.0135  
-    ## 6 The Silver Cord-Polygondwanaland          0.307  0.0732     0.541     0.000512
-    ## 7 Willoughby’s Beach-Polygondwanaland       0.277  0.0180     0.537     0.0207  
-    ## 8 The Silver Cord-Sketches of Brunswick…    0.228  0.0103     0.445     0.0277
+``` r
+spotify_models %>%
+    unnest(tukey) %>%
+    filter(adj.p.value < 0.05) %>%
+    select(artist_name, contrast, estimate, conf.low, conf.high)
+```
+
+    ## # A tibble: 34 × 5
+    ##    artist_name    contrast                           estimate conf.low conf.high
+    ##    <chr>          <chr>                                 <dbl>    <dbl>     <dbl>
+    ##  1 Arctic Monkeys Favourite Worst Nightmare (Standa…    0.196   0.0306     0.361
+    ##  2 Arctic Monkeys Suck It and See-AM                    0.219   0.0541     0.384
+    ##  3 Arctic Monkeys The Car-AM                           -0.286  -0.459     -0.113
+    ##  4 Arctic Monkeys Whatever People Say I Am, That's …    0.191   0.0289     0.353
+    ##  5 Arctic Monkeys The Car-Favourite Worst Nightmare…   -0.482  -0.655     -0.309
+    ##  6 Arctic Monkeys The Car-Humbug                       -0.413  -0.594     -0.233
+    ##  7 Arctic Monkeys The Car-Suck It and See              -0.505  -0.678     -0.332
+    ##  8 Arctic Monkeys Tranquility Base Hotel & Casino-T…    0.361   0.185      0.538
+    ##  9 Arctic Monkeys Whatever People Say I Am, That's …    0.477   0.307      0.647
+    ## 10 Lana Del Rey   Born To Die (Deluxe Version)-Blue…    0.390   0.229      0.551
+    ## # ℹ 24 more rows
 
 The adjusted P value determines if the pairwise comparison (`contrast`)
 is significantly different (p \< 0.05) or not, here I filtered for only
-significantly different comparisons. alt-J has none and it’s interesting
-to see that KG&LW has less pairs of albums with significantly different
-mean energy than Lana del Rey and Arctic Monkeys (8 pairs vs 17 and 9
-respectively).
+significantly different comparisons (p \< 0.05). alt-J has none and it’s
+interesting to see that KG&LW has less pairs of albums with
+significantly different mean energy than Lana del Rey and Arctic Monkeys
+(8 pairs vs 17 and 9 respectively).
 
 Now I’ll make some final plots to show the relationship between albums,
 the idea is to connect albums that are similar to each other. I’ll first

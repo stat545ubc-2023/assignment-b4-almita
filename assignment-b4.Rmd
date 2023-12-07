@@ -127,6 +127,7 @@ artists <- spotify$artist_name %>% unique()
 
 head(spotify)
 ```
+
 There are some albums in the dataset that are repeated, are remixes, or live recordings. I will remove those and keep only the artist's distinct albums. 
 
 ```{r}
@@ -145,6 +146,7 @@ spotify_distinct %>%
 		theme_bw() +
 		facet_wrap(~artist_name)
 ```
+
 There seems to be a somewhat negative trend for Lana del Rey's music getting less energetic throughout the years. Arctic Monkey's las album also seems to be much more less energetic than the rest. alt-J doesn't show much difference, and KG&LW is all over the place.
 
 Another plot that can help visualize this evolution is a ridgeline plot.
@@ -214,35 +216,41 @@ spotify_models
 
 So as we could see before, both Arctic Monkeys and Lana del Rey have a negative trend of energy across time (negative slope), with a more pronounced decline in Lana del Rey. However the adjusted R squared value is not particularly high, meaning that the model isn't that well of a fit. In the case of alt-J and KG&LW there is no significant trend and the model doesn't predict at all the behavior of energy across time (notice the negative `adj_r_sq`). 
 
-However after looking at the distribution plots I'm sure there are at least some albums whose average energy is significantly different from the others, at least for Arctic Monkeys, Lana del Rey, and KG&LW. So I'll try to perform an anova model too :D
+However after looking at the distribution plots I'm sure there are at least some albums whose average energy is significantly different from the others, at least for Arctic Monkeys, Lana del Rey, and KG&LW. So I'll do an anova model too to determine if there are at least 1 album with a significantly different mean energy than the others for each artist. 
 
 ```{r}
 spotify_models <- spotify_models %>%
 	mutate(aov = map(data, \(x) aov(energy ~ album_name, x)),
-				 aov_summary = map(aov, summary)
+				 aov_summary = map(aov, broom::tidy)
 				 ) 
 names(spotify_models$aov) <- artists
 names(spotify_models$aov_summary) <- artists
-
-spotify_models$aov_summary
 ```
-We can see from the `Pr(>F)` values that for Arctic Monkeys, Lana del Rey, and KG&LW there is at least 1 album that has a significantly different mean energy from the rest. So now I can perform a Tukey HSD test to see exactly which albums have significantly differente mean energy from each other.
+
+```{r}
+spotify_models %>%
+	unnest(aov_summary) %>%
+	filter(term != "Residuals") %>%
+	select(artist_name,p.value)
+```
+
+We can see from the p.values that for Arctic Monkeys, Lana del Rey, and KG&LW there is at least 1 album that has a significantly different mean energy from the rest. So now I can perform a Tukey HSD test to see exactly which albums have significantly different mean energy from each other.
 
 ```{r}
 spotify_models <- spotify_models %>%
 	mutate(tukey = map(aov, \(x) TukeyHSD(x) %>% broom::tidy()))
 
 names(spotify_models$tukey) <- artists
-
-walk(spotify_models$tukey, 
-		\(x) { tbl <- filter(x, adj.p.value < 0.05) %>% # print only significantly different pairs
-		select(contrast, estimate, conf.low, conf.high, adj.p.value)
-		print(tbl) 
-		}
- 	 ) 
 ```
 
-The adjusted P value determines if the pairwise comparison (`contrast`) is significantly different (p < 0.05) or not, here I filtered for only significantly different comparisons. alt-J has none and it's interesting to see that KG&LW has less pairs of albums with significantly different mean energy than Lana del Rey and Arctic Monkeys (8 pairs vs 17 and 9 respectively).
+```{r}
+spotify_models %>%
+	unnest(tukey) %>%
+	filter(adj.p.value < 0.05) %>%
+	select(artist_name, contrast, estimate, conf.low, conf.high)
+```
+
+The adjusted P value determines if the pairwise comparison (`contrast`) is significantly different (p < 0.05) or not, here I filtered for only significantly different comparisons (p < 0.05). alt-J has none and it's interesting to see that KG&LW has less pairs of albums with significantly different mean energy than Lana del Rey and Arctic Monkeys (8 pairs vs 17 and 9 respectively).
 
 Now I'll make some final plots to show the relationship between albums, the idea is to connect albums that are similar to each other. I'll first make a matrix that contains a 1 if the albums mean energy is significantly similar, then I'll make a network graph. 
 

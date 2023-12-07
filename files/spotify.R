@@ -11,5 +11,5 @@ artist_list <- c("alt-j", "arctic monkeys", "lana del rey", "king gizzard & the 
 artist_tracks <- map(artist_list, get_artist_audio_features)
 
 bind_rows(artist_tracks) %>%
-	select(track_name, track_number, album_name, album_release_date, album_release_year, danceability, energy, loudness, duration_ms, tempo, valence) %>%
+	select(track_name, artist_name, track_number, album_name, album_release_date, album_release_year, danceability, energy, loudness, duration_ms, tempo, valence) %>%
 	write.csv(file = "spotify.csv")
